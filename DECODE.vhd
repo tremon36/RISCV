@@ -123,7 +123,7 @@ process(clock,instruction,data_rs1,data_rs2,reset,stall) begin
                         --  OP1       -------OP2 (UNSIGNED) -------------    OFFSET    ------RD----------------           SUBOPCODE                  OPCODE
               else 
               if(instruction(31) = '1') then 
-              resultado <= data_rs1 & X"11111" & instruction(31 downto 20) & X"000" & instruction(11 downto 7) & instruction(14 downto 12) & instruction(6 downto 0);
+              resultado <= data_rs1 & X"FFFFF" & instruction(31 downto 20) & X"000" & instruction(11 downto 7) & instruction(14 downto 12) & instruction(6 downto 0);
                         --  OP1       -------OP2 (SIGNED) ---------------    OFFSET    ------RD----------------           SUBOPCODE                  OPCODE
               else 
               resultado <= data_rs1 & X"00000" & instruction(31 downto 20) & X"000" & instruction(11 downto 7) & instruction(14 downto 12) & instruction(6 downto 0);
