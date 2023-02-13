@@ -179,7 +179,6 @@ Port (op1,op2 : in std_logic_vector (31 downto 0);-- in case inmediate intructio
      port(
         stall,reset,clk: in std_logic;
         memory_dir,memory_to_write: out std_logic_vector(31 downto 0);
-        memory_data: in std_logic_vector(31 downto 0);
         rw,stall_prev: out std_logic;
         decoded_instruction: in std_logic_vector(90 downto 0);
         instruction_z: out std_logic_vector(90 downto 0);
@@ -193,6 +192,7 @@ component WRITE
         reset : in std_logic;
         clk : in std_logic;
         stall_in : in std_logic;
+        memory_data_response: in std_logic_vector(31 downto 0);
         data_out : out std_logic_vector (31 downto 0);
         dir_out : out std_logic_vector (4 downto 0);
         write_enable : out std_logic
@@ -335,7 +335,6 @@ begin
            clk,
            memory_dir,                             -- Direccion de memoria de la que se va a leer/escribir 
            memory_data_to_write,                   -- Datos que se van a escribir en memoria (se envia al modulo de memoria)
-           memory_data_to_read,                    -- Datos resultado de leer en memoria (los envia el modulo de memoria)
            rw_memory,                              -- Indicacion a la memoria de si se va a leer (0) o a escribir (1)
            stall_previous_memory,                  -- Parada del pipeline hasta obtener un resultado de memoria 
            decoded_instruction_exe,                -- Instruccion que pasa la etapa execute a las siguientes
@@ -343,13 +342,14 @@ begin
            bytes_to_write_memory);                 -- Cantidad de bytes que van a ser escritos/leidos en memoria
            
    write_stage: WRITE port map(
-            decoded_instruction_memory,            -- Instruccion que pasa la etapa memory 
-            reset_write,                           
-            clk,
-            stall_write,
-            data_to_write_to_registers,            -- datos de escritura en registros (mandar a los registros)
-            register_direction_to_write,           -- direccion de escritura en los registros
-            enable_write_to_registers);            -- Indicar a los registros si se debe escribir o no
+           decoded_instruction_memory,            -- Instruccion que pasa la etapa memory 
+           reset_write,                           
+           clk,
+           stall_write,
+           memory_data_to_read,                   -- Datos resultado de leer en memoria (los envia el modulo de memoria)
+           data_to_write_to_registers,            -- datos de escritura en registros (mandar a los registros)
+           register_direction_to_write,           -- direccion de escritura en los registros
+           enable_write_to_registers);            -- Indicar a los registros si se debe escribir o no
                    
             
    --registros que contienen el contador de programa asociado a la instrucccion que se esta ejecutando en esa etapa del pipeline 

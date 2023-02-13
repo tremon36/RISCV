@@ -26,12 +26,12 @@ process(RAM_CLOCK)
 begin
  if(rising_edge(RAM_CLOCK)) then
  if(RAM_WR='1') then -- when write enable = 1, 
- 
-    RAM(to_integer(unsigned(RAM_ADDR))) <= RAM_DATA_IN(7 downto 0);
-
+ RAM(to_integer(unsigned(RAM_ADDR))) <= RAM_DATA_IN(7 downto 0);
+ else 
+ RAM_DATA_OUT <= RAM(to_integer(unsigned(RAM_ADDR)));
  end if;
  end if;
 end process;
  -- Data to be read out 
- RAM_DATA_OUT <= RAM(to_integer(unsigned(RAM_ADDR)));
+
 end Behavioral;

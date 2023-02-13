@@ -7,7 +7,6 @@ entity MEMORY is
     port(
         stall,reset,clk: in std_logic;
         memory_dir,memory_to_write: out std_logic_vector(31 downto 0);
-        memory_data: in std_logic_vector(31 downto 0);
         rw,stall_prev: out std_logic;
         decoded_instruction: in std_logic_vector(90 downto 0);
         instruction_z: out std_logic_vector(90 downto 0);
@@ -42,19 +41,11 @@ process(clk,reset)
     memory_dir<=decoded_instruction(90 downto 59);
 
     case OPCODE is 
-    when"0000011" =>
+    when"0000011" => -- las lecturas de memoria las envia directamente la memoria RAM a write, evitar ciclo de latencia de lectura
         bytes <= "00";
         rw <= '0';
         memory_to_write <=x"00000000"; 
-        case SUBOPCODE is 
-            when "000" => internal_result <= std_logic_vector(resize(signed(memory_data(7 downto 0)), 32))&decoded_instruction(58 downto 0);
-            when "001" => internal_result <= std_logic_vector(resize(signed(memory_data(15 downto 0)), 32))&decoded_instruction(58 downto 0);
-            when "010" => internal_result <= memory_data(31 downto 0) & decoded_instruction(58 downto 0);  
-            when "100" => internal_result <= x"000000" & memory_data(7 downto 0)&decoded_instruction(58 downto 0);  
-            when "101" => internal_result <= x"0000" & memory_data(15 downto 0)&decoded_instruction(58 downto 0);
-            when others =>
-                         internal_result <= decoded_instruction;                     
-        end case;
+        internal_result <= decoded_instruction;                     
      when "0100011" =>
         internal_result<= decoded_instruction; 
         case SUBOPCODE is 
