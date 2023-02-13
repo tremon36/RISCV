@@ -122,9 +122,9 @@ port(
     current_pc,instruction:in std_logic_vector(31 downto 0);
     current_inst,memory_dir_request,cp_inst: out std_logic_vector (31 downto 0);
     r_w: out std_logic;
-    amount:out std_logic_vector(1 downto 0)
-    -- rs2_dir,rs1_dir,rd_dir: out std_logic_vector(4 downto 0);
-   --  will_write_flag_decode: out std_logic
+    amount:out std_logic_vector(1 downto 0);
+    branch_prediction_address: out std_logic_vector(31 downto 0);
+    enable_parallel_cp: out std_logic
     );
 end component FETCH;
 
@@ -200,8 +200,8 @@ component WRITE
  end component WRITE;
 
 --signals de program counter 
-signal stall_pc, enable_parallel_load: std_logic;
-signal instruction_pointer_PC,jump_result: std_logic_vector(31 downto 0);
+signal stall_pc, enable_parallel_load_pc: std_logic;
+signal instruction_pointer_PC,parallel_load_data_pc: std_logic_vector(31 downto 0);
 
 --signals de fetch
 signal stall_fetch,r_w_instruction_memory,reset_fetch: std_logic;
@@ -210,6 +210,8 @@ signal instruction_pointer_salida_fetch: std_logic_vector(31 downto 0);
 signal instruction_size: std_logic_vector(1 downto 0);
 signal rs1_dir,rs2_dir,rd_dir: std_logic_vector(4 downto 0);
 signal rs1_busy_flag,rs2_busy_flag,dest_reg_busy_flag: std_logic;
+signal fetch_branch_prediction_address: std_logic_vector(31 downto 0);
+signal fetch_enable_parallel_cp: std_logic;
 
 --signals de decode
 signal stall_decode,reset_decode,stall_prev,read_from_register_UNASSIGNED: std_logic;
@@ -221,7 +223,8 @@ signal will_write_flag_decode:std_logic;
 --signals de jump 
 signal stall_jump,reset_jump,reset_prev_to_jump: std_logic;
 signal decoded_instruction_jump: std_logic_vector(90 downto 0);
-signal jump_instruction_pointer,instruction_pointer_salida_jump: std_logic_vector(31 downto 0);
+signal jump_instruction_pointer,instruction_pointer_salida_jump,jump_result: std_logic_vector(31 downto 0);
+signal enable_parallel_load_jump: std_logic;
 
 --signals de execute 
 signal stall_exe,reset_exe,stall_previous_exe:std_logic;
@@ -264,10 +267,10 @@ begin
     programCounter: CP port map ( --TODO a�adir stall_out de todos los siguientes 
             stall_pc,             
             reset,
-            enable_parallel_load,   --tiene que ser 1 cuando se vaya a actualizar el PC por la etapa JUMP
+            enable_parallel_load_pc,   --tiene que ser 1 cuando se vaya a actualizar el PC por la etapa JUMP
             clk,
             instruction_pointer_PC, --la direccion guardada el contador de programa
-            jump_result);           --la direccion a la que actualizar el contador de programa en un salto
+            parallel_load_data_pc);           --la direccion a la que actualizar el contador de programa en un salto
             
     fetch_stage: FETCH port map (
             stall_fetch,
@@ -279,7 +282,9 @@ begin
             instruction_memory_dir_request,     -- Direccion de peticion de busqueda a la memoria
             instruction_pointer_salida_fetch,   -- Puntero de instruccion asociado a la instruccion de salida
             r_w_instruction_memory,             -- Indicacion a la memoria de que se va a leer o a escribir (deberia ser siempre 0, read)
-            instruction_size
+            instruction_size,
+            fetch_branch_prediction_address,    -- Target ADDR de la prediccion de saltos. De momento solo incondicionales. Mandar a PC
+            fetch_enable_parallel_cp            -- Enable del load del contador de programa, para la prediccion de saltos
             );
 
     decode_stage: DECODE port map(
@@ -307,7 +312,7 @@ begin
             instruction_pointer_salida_decode,  -- PC asociado a la instruccion que esta pasando por la etapa
             jump_result,                        -- Direccion de instruccion a la que saltar de ser necesario (es el valor de parallel load del PC)
             reset_prev_to_jump,                 -- Resetear las etapas anteriores si se salta, pues contienen instrucciones que no hay que ejecutar
-            enable_parallel_load );             -- Indicar al PC si debe ejecutar el salto (hacer carga paralela)
+            enable_parallel_load_jump);         -- Indicar al PC si debe ejecutar el salto (hacer carga paralela)
             
             
     execute_stage: EXE port map(                    -- Campos de la instruccion decodificada
@@ -460,7 +465,13 @@ begin
    reset_write <= reset;
    stall_write <= '0';
 
-    displayed_number <= data_to_write_to_registers(15 downto 0);
+   displayed_number <= data_to_write_to_registers(15 downto 0);
+
+   -- control de la carga del contador de programa
+
+   enable_parallel_load_pc <= enable_parallel_load_jump or fetch_enable_parallel_cp;
+   parallel_load_data_pc <= jump_result when enable_parallel_load_jump = '1' else 
+                            fetch_branch_prediction_address;
     
    
    

@@ -130,11 +130,11 @@ begin
                         enable_parallel_cp<='0';
                         pc_actualizado<=x"00000000";
                       end case;
-                when "1101111" => -- JAL 
-                       pc_actualizado <= instruction(90 downto 59) + current_pc;
-                       reset_prev <= '1';
-                       enable_parallel_cp <= '1';
-                       internal_instruction_result <= instruction;
+                --when "1101111" => -- JAL 
+                --      pc_actualizado <= instruction(90 downto 59) + current_pc;
+                --       reset_prev <= '1';
+                --       enable_parallel_cp <= '1';
+                --       internal_instruction_result <= instruction;
                 when "1100111" => --JALR 
                        pc_actualizado <= (x"FFFFFFF" & "1110") and (instruction(90 downto 59) + std_logic_vector(resize(signed(instruction(26 downto 15)), 32))); --porque este tiene todos los bit
                        reset_prev <= '1';
