@@ -1,17 +1,19 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
-
-
 entity Pipeline_completo is
     port(
         reset,clk: in std_logic;
+        debug_read_reg_addr: in std_logic_vector(4 downto 0);
         Anode_Activate : out STD_LOGIC_VECTOR (3 downto 0);-- 4 Anode signals
         LED_out : out STD_LOGIC_VECTOR (6 downto 0)
         );
 end Pipeline_completo;
 
 architecture Behavioral of Pipeline_completo is
+
+ --DEBUG signal
+ signal debug_data_output: std_logic_vector(31 downto 0);
 
 --display de 7 segmentos
 signal displayed_number : std_logic_vector (15 downto 0);
@@ -60,6 +62,7 @@ end component Single_port_RAM;
 
 component memory_manager is
     port(
+        clk,stall,reset: in std_logic;
         rw  : in std_logic;
         byte_amount : in std_logic_vector(1 downto 0);
         write_data: in std_logic_vector(31 downto 0);
@@ -89,6 +92,7 @@ component Registros is
         port (
         r_dataBus1 : out std_logic_vector (31 downto 0);
         r_dataBus2 : out std_logic_vector (31 downto 0);
+        r_dataBus_debug: out std_logic_vector(31 downto 0); -- DEBUG
         w_dataBus : in std_logic_vector (31 downto 0);
 
         writeAddress : in std_logic_vector (4 downto 0);
@@ -108,7 +112,9 @@ component Registros is
         
         r_f1 : out std_logic;
         r_f2 : out std_logic;
-        r_f3 : out std_logic
+        r_f3 : out std_logic;
+
+        debug_read_reg_addr: in std_logic_vector(4 downto 0) -- DEBUG
     );
     end component;
 
@@ -404,6 +410,7 @@ begin
         );                                             
     
   interfaz_RAM: memory_manager port map(
+        clk,'0',reset,                                                                  -- At least for now, this phase never stalls
         rw_memory,                                                                      -- Enable de escritura en memoria, lo proporciona la etapa memory
         bytes_to_write_memory,                                                          -- Cantidad de bits a escribir (00 -> 8 bit, 01 -> 16 bit, else 32 bit). Lo proporciona memory
         memory_data_to_write,                                                           -- Datos a escribir en memoria, lo proporciona memory
@@ -422,6 +429,7 @@ begin
    banco_registros: Registros port map(
        data_rs1,                                    -- Datos de lectura de rs1, se envia a decode (primer operando)
        data_rs2,                                    -- Datos de lectura de rs2, se envia a decode (segundo operando) 
+       debug_data_output,                            -- DEBUG
        data_to_write_to_registers,                  -- Datos que envia Write para escribir en los registros
        register_direction_to_write,                 -- Direccion en la que se van a escribir los datos que envia write
        enable_write_to_registers,                   -- Enable que debe poner a 1 write para escribir
@@ -435,7 +443,8 @@ begin
        clk,
        rs1_busy_flag,
        rs2_busy_flag,
-       dest_reg_busy_flag
+       dest_reg_busy_flag,
+       debug_read_reg_addr
    
    );
    
@@ -465,7 +474,7 @@ begin
    reset_write <= reset;
    stall_write <= '0';
 
-   displayed_number <= data_to_write_to_registers(15 downto 0);
+   displayed_number <= debug_data_output(15 downto 0);
 
    -- control de la carga del contador de programa
 

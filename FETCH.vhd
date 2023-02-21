@@ -43,7 +43,7 @@ amount<="10";
                                          
 memory_dir_request <= current_pc;
 
-process(clock,to_sum_offset)
+process(clock,to_sum_offset,instruction,reset,current_pc)
 begin
 if(instruction(6 downto 0) = "1101111" and reset = '0') then -- JAL instruction, inconditional jump 
 

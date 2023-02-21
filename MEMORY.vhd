@@ -35,14 +35,14 @@ OPCODE <= decoded_instruction(6 downto 0);
 SUBOPCODE <= decoded_instruction(9 downto 7);
 
 registro_salida: Registro_Intermedio_Decodificado port map(reset,stall,clk,internal_result,instruction_z);
-
-process(clk,reset) 
+memory_dir<=decoded_instruction(90 downto 59);
+process(clk,reset,decoded_instruction,SUBOPCODE,OPCODE) 
     begin 
-    memory_dir<=decoded_instruction(90 downto 59);
+    
 
     case OPCODE is 
     when"0000011" => -- las lecturas de memoria las envia directamente la memoria RAM a write, evitar ciclo de latencia de lectura
-        bytes <= "00";
+        bytes <= SUBOPCODE(1 downto 0);
         rw <= '0';
         memory_to_write <=x"00000000"; 
         internal_result <= decoded_instruction;                     

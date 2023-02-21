@@ -74,7 +74,7 @@ begin
     arithmetic <= ofsset(5);
     stall_out <= '0';
     
-    process (clk)
+    process (clk,reset,op_code,op1,op2,ofsset,rd,sub_op_code,Instructio_pointer,l_s,l_u,z_shift)
     
         begin 
             --Alu reset;

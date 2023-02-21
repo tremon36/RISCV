@@ -28,7 +28,7 @@ begin
     OPCODE <= decode_instruction(6 downto 0);
     SUBOPCODE <= decode_instruction(9 downto 7);
     
-    process (clk,OPCODE,SUBOPCODE,memory_data_response)
+    process (clk,OPCODE,SUBOPCODE,memory_data_response,decode_instruction)
     begin  
         --If its an instruction that needs to write in the register, then acces to the if below.               
         if (OPCODE /= "1100011" and OPCODE /= "0100011" and OPCODE /= "0000000")then

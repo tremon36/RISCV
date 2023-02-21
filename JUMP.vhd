@@ -50,7 +50,7 @@ num1<=instruction(90 downto 59);
 num2<= instruction(58 downto 27);
 signed_offset <= std_logic_vector(resize(signed(instruction(26 downto 15) & '0'), 32)); -- extension en signo, añadiendo el bit extra
 
-process(clk)
+process(clk,reset,OPCODE,instruction,SUBOPCODE,e,signed_offset,current_pc,g,e,l,lu,gu,eu)
 begin
    
         if reset = '1' then

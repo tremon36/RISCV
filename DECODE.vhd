@@ -47,7 +47,7 @@ stall_prev <= '0';
 
 registro_salida: Registro_Intermedio_Decodificado port map (reset or stall,stall,clock, resultado,decoded_instruction);
 
-process(clock,instruction,data_rs1,data_rs2,reset,stall) begin      
+process(clock,instruction,data_rs1,data_rs2,reset,stall,OPCODE,SUBOPCODE) begin      
          
     case OPCODE is 
             
