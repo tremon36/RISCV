@@ -10,7 +10,7 @@ entity memory_manager is
         rw  : in std_logic;
         byte_amount : in std_logic_vector(1 downto 0);
         write_data: in std_logic_vector(31 downto 0);
-        requested_address: in std_logic_vector(6 downto 0);
+        requested_address: in std_logic_vector(8 downto 0);
         response_data1,response_data2,response_data3,response_data4 : in std_logic_vector(7 downto 0);
         write_data1,write_data2,write_data3,write_data4 : out std_logic_vector(7 downto 0);
         request_adress_forward_1,request_adress_forward_2,request_adress_forward_3,request_adress_forward_4: out std_logic_vector(6 downto 0);
@@ -28,16 +28,16 @@ begin
 
     lower_two_bit <= requested_address(1 downto 0);
 
-    request_adress_forward_1 <= requested_address;
-    request_adress_forward_2 <= requested_address when byte_amount = "00" else  --1 byte
-                                requested_address + "0000001";                  --halfword or word
+    request_adress_forward_1 <= requested_address(8 downto 2);
+    request_adress_forward_2 <= requested_address(8 downto 2);-- when byte_amount = "00" else  --1 byte
+                                --requested_address(31 downto 2) + "0000001";                  --halfword or word
 
-    request_adress_forward_3 <= requested_address when byte_amount = "00" or (byte_amount = "01" and lower_two_bit = "10") else
-                                requested_address + "0000010";
+    request_adress_forward_3 <= requested_address(8 downto 2);-- when byte_amount = "00" or (byte_amount = "01" and lower_two_bit = "10") else
+                                --requested_address(31 downto 2) + "0000010";
                             
-    request_adress_forward_4 <= requested_address when byte_amount = "00" else
-                                requested_address + "0000001" when byte_amount = "01" and lower_two_bit = "10" else 
-                                requested_address + "0000011";
+    request_adress_forward_4 <= requested_address(8 downto 2);-- when byte_amount = "00" else
+                                --requested_address(31 downto 2) + "0000001" when byte_amount = "01" and lower_two_bit = "10" else 
+                                --requested_address(8 downto 2) + "0000011";
 
 
     data_output_32_bit <= x"000000" & response_data1 when byte_amount_delay_register_output = "00" and lower_two_bit_delay_register_output = "00" else

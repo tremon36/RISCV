@@ -25,15 +25,6 @@ component seven_segment_display_VHDL is
            displayed_number: in STD_LOGIC_VECTOR (15 downto 0));
 end component seven_segment_display_VHDL;
 
---CONTADOR DE PROGRAMA
-
-component CP
-        port(
-        count,reset,enable_parallel_load,clock:in std_logic;
-        current_num:out std_logic_vector(31 downto 0);
-        load: in std_logic_vector(31 downto 0)
-        );
-end component CP;
 
 
 --REGISTROS INTERMEDIOS PARA GUARDAR DATOS RELATIVOS A signal 
@@ -66,7 +57,7 @@ component memory_manager is
         rw  : in std_logic;
         byte_amount : in std_logic_vector(1 downto 0);
         write_data: in std_logic_vector(31 downto 0);
-        requested_address: in std_logic_vector(6 downto 0);
+        requested_address: in std_logic_vector(8 downto 0);
         response_data1,response_data2,response_data3,response_data4 : in std_logic_vector(7 downto 0);
         write_data1,write_data2,write_data3,write_data4 : out std_logic_vector(7 downto 0);
         request_adress_forward_1,request_adress_forward_2,request_adress_forward_3,request_adress_forward_4: out std_logic_vector(6 downto 0);
@@ -75,15 +66,51 @@ component memory_manager is
     );
 end component memory_manager;
 
---MEMORIA DE INSTRUCCIONES 
+-- MEMORIA DE INSTRUCCIONES (1,2,3,4) (mas adelante se utilizara un solo componente, mientras sea ROM es necesario 4)
 
-component Instruction_memory 
+component Instruction_memory is
 port(
+ clk: in std_logic;
  RAM_ADDR: in std_logic_vector(6 downto 0); -- Address to write/read RAM
- RAM_DATA_OUT: out std_logic_vector(31 downto 0) ;-- Data output of RAM
- byte_amount: in std_logic_vector(1 downto 0)
+ RAM_DATA_OUT: out std_logic_vector(7 downto 0) -- Data output of RAM
 );
-end component Instruction_memory;
+end component instruction_memory;
+
+component Instruction_memory_2 is
+port(
+ clk: in std_logic;
+ RAM_ADDR: in std_logic_vector(6 downto 0); -- Address to write/read RAM
+ RAM_DATA_OUT: out std_logic_vector(7 downto 0) -- Data output of RAM
+);
+end component instruction_memory_2;
+
+component Instruction_memory_3 is
+port(
+ clk: in std_logic;
+ RAM_ADDR: in std_logic_vector(6 downto 0); -- Address to write/read RAM
+ RAM_DATA_OUT: out std_logic_vector(7 downto 0) -- Data output of RAM
+);
+end component instruction_memory_3;
+
+component Instruction_memory_4 is
+port(
+ clk: in std_logic;
+ RAM_ADDR: in std_logic_vector(6 downto 0); -- Address to write/read RAM
+ RAM_DATA_OUT: out std_logic_vector(7 downto 0) -- Data output of RAM
+);
+end component instruction_memory_4;
+
+
+
+-- INTERFAZ PARA MEMORIA DE INSTRUCCIONES 
+
+component IRAM_memory_manager is
+    port(
+        RAM_ADDR: in std_logic_vector(31 downto 0);
+        ram1_response,ram2_response,ram3_response,ram4_response: in std_logic_vector(7 downto 0);
+        RAM_1_ADDR,RAM_2_ADDR,RAM_3_ADDR,RAM_4_ADDR, RAM_RESPONSE: out std_logic_vector(31 downto 0)
+        );
+end component IRAM_memory_manager; 
 
 
 --BANCO DE REGISTROS 
@@ -121,16 +148,13 @@ component Registros is
 
 --FETCH 
 
-component FETCH
-    
-port(
-    stall,reset,clock:in std_logic;
-    current_pc,instruction:in std_logic_vector(31 downto 0);
-    current_inst,memory_dir_request,cp_inst: out std_logic_vector (31 downto 0);
-    r_w: out std_logic;
-    amount:out std_logic_vector(1 downto 0);
-    branch_prediction_address: out std_logic_vector(31 downto 0);
-    enable_parallel_cp: out std_logic
+
+component FETCH is
+    port(
+        stall,hard_reset,clk,enable_parallel_load_cp: in std_logic;
+        pc_parallel_load,IRAM_output: in std_logic_vector(31 downto 0);
+        IRAM_addr_request: out std_logic_vector(31 downto 0);
+        ins_output,pc_output: out std_logic_vector(31 downto 0)
     );
 end component FETCH;
 
@@ -254,10 +278,8 @@ signal register_direction_to_write: std_logic_vector(4 downto 0);
 
 --signals de la memoria de instrucciones 
 
-signal load_instruction: std_logic_vector(31 downto 0);
-signal load_dir_instruction_memory: std_logic_vector(31 downto 0);
-signal load_enable_instruction_memory: std_logic;
-signal load_bytes_instruction_memory: std_logic_vector(1 downto 0);
+signal iram1_addr,iram2_addr,iram3_addr,iram4_addr: std_logic_vector(31 downto 0);
+signal iram1_response,iram2_response,iram3_response,iram4_response : std_logic_vector(7 downto 0);
 
 --signals de la memoria de datos
 
@@ -270,28 +292,18 @@ signal ram_enables: std_logic_vector(3 downto 0);
 
 begin
     
-    programCounter: CP port map ( --TODO a�adir stall_out de todos los siguientes 
-            stall_pc,             
-            reset,
-            enable_parallel_load_pc,   --tiene que ser 1 cuando se vaya a actualizar el PC por la etapa JUMP
-            clk,
-            instruction_pointer_PC, --la direccion guardada el contador de programa
-            parallel_load_data_pc);           --la direccion a la que actualizar el contador de programa en un salto
-            
-    fetch_stage: FETCH port map (
-            stall_fetch,
-            reset_fetch,
-            clk,
-            instruction_pointer_PC,             -- la direccion que el PC le pasa a fetch
-            instruccion_actual_entrada_fetch,   -- resultado de buscar en la memoria de instrucciones
-            instruccion_salida_fetch,           -- salida de fetch (instruccion a pasar por el pipeline)
-            instruction_memory_dir_request,     -- Direccion de peticion de busqueda a la memoria
-            instruction_pointer_salida_fetch,   -- Puntero de instruccion asociado a la instruccion de salida
-            r_w_instruction_memory,             -- Indicacion a la memoria de que se va a leer o a escribir (deberia ser siempre 0, read)
-            instruction_size,
-            fetch_branch_prediction_address,    -- Target ADDR de la prediccion de saltos. De momento solo incondicionales. Mandar a PC
-            fetch_enable_parallel_cp            -- Enable del load del contador de programa, para la prediccion de saltos
-            );
+
+    fetch_stage: FETCH port map(
+        stall_fetch,                                   
+        reset,                                          -- No es necesario un reset al saltar para esta etapa (enable parallel hace esa funcion)                                
+        clk,
+        enable_parallel_load_jump,                      -- enable de carga paralela de una direccion en el contador de programa (lo envia jump)
+        jump_result,                                    -- direccion a cargar en el contador de programa si el enable anterior esta activo
+        instruccion_actual_entrada_fetch,               -- resultado de la busqueda en memoria de la instruccion, se envía directamente al pipeline
+        instruction_pointer_PC,                         -- direccion en la que buscar una instruccion en memoria, se envia a IRAM_memory_manager
+        instruccion_salida_fetch,                       -- salida de la instruccion actual al pipeline, se envia a decode
+        instruction_pointer_salida_fetch                -- Contador de programa asociado a la instruccion que se pasa por el pipeline
+        );
 
     decode_stage: DECODE port map(
             reset_decode,                       
@@ -369,13 +381,22 @@ begin
    registro_exe_cp: RegistroF port map (
         reset_exe,stall_exe,clk,instruction_pointer_salida_jump,instruction_pointer_salida_exe);
         
-   --memoria de instrucciones y de datos
+   --memoria de instrucciones
+     
+   iram1: Instruction_memory port map(clk,iram1_addr(6 downto 0),iram1_response);
+   iram2: Instruction_memory_2 port map(clk,iram2_addr(6 downto 0),iram2_response);  
+   iram3: Instruction_memory_3 port map(clk,iram3_addr(6 downto 0),iram3_response);  
+   iram4: Instruction_memory_4 port map(clk,iram4_addr(6 downto 0),iram4_response);       
+                                         
+   -- interfaz para memoria de instrucciones
 
-   
-   memoria_instrucciones: Instruction_memory  port map(
-        instruction_pointer_PC(6 downto 0),         -- Direccion de instruccion a buscar
-        instruccion_actual_entrada_fetch,           -- Instruccion de la que se va a hacer fetch (resultado de la busqueda en la memoria)
-        "10");                                      -- Cantidad de bytes que se van a leer, deberia ser siempre 4 (10 o 11)
+    i_memory_manager: IRAM_memory_manager port map(
+        instruction_pointer_PC,
+        iram1_response, iram2_response, iram3_response, iram4_response,
+        iram1_addr,iram2_addr,iram3_addr,iram4_addr,
+        instruccion_actual_entrada_fetch
+    );
+   -- memorias de datos
         
    ram_1: Single_port_RAM port map(
         memory_manager_forwarded_address_1(6 downto 0),                   -- Direccion de memoria que viene del memory manager
@@ -414,7 +435,7 @@ begin
         rw_memory,                                                                      -- Enable de escritura en memoria, lo proporciona la etapa memory
         bytes_to_write_memory,                                                          -- Cantidad de bits a escribir (00 -> 8 bit, 01 -> 16 bit, else 32 bit). Lo proporciona memory
         memory_data_to_write,                                                           -- Datos a escribir en memoria, lo proporciona memory
-        memory_dir(6 downto 0),                                                         -- Direccion en la que escribir en memoria, lo proporciona memory
+        memory_dir(8 downto 0),                                                         -- Direccion en la que escribir en memoria, lo proporciona memory
         ram_1_response,ram_2_response,ram_3_response,ram_4_response,                    -- Respuestas de las memorias RAM, contienen datos a juntar. 
         ram_1_write_data,ram_2_write_data,ram_3_write_data,ram_4_write_data,            -- Datos separados enviados a cada banco RAM para escribir en ellos
         memory_manager_forwarded_address_1(6 downto 0),                                             -- Direccion en la que escribir en memoria, reenviado por la interfaz a cada RAM
@@ -476,11 +497,7 @@ begin
 
    displayed_number <= debug_data_output(15 downto 0);
 
-   -- control de la carga del contador de programa
 
-   enable_parallel_load_pc <= enable_parallel_load_jump or fetch_enable_parallel_cp;
-   parallel_load_data_pc <= jump_result when enable_parallel_load_jump = '1' else 
-                            fetch_branch_prediction_address;
     
    
    
