@@ -45,7 +45,7 @@ begin
 
 program_counter: CP port map(not stall,hard_reset,enable_parallel_load_internal,clk,pc_current_num,pc_parallel_load_internal);
 registro_salida: RegistroF port map(hard_reset,stall and not enable_parallel_load_cp,clk,delay_reg_input,delay_reg_output);
-registro_delay_ins: RegistroF port map('0',stall_delayed,clk,ins_output_internal,delayed_ins_output_reg);
+registro_delay_ins: RegistroF port map(hard_reset,stall_delayed,clk,ins_output_internal,delayed_ins_output_reg);
 
 ins_output <= ins_output_internal;
 IRAM_addr_request <= target_address when enable_parallel_load_internal = '1' else -- search target address in RAM only for inconditional jumps, else search pc content
@@ -56,9 +56,9 @@ pc_parallel_load_internal <= target_address_plus_4 when enable_parallel_load_cp 
 target_address_plus_4 <= target_address + x"00000004";
 delay_reg_input <= pc_current_num when enable_parallel_load_internal = '0' or enable_parallel_load_cp = '1' else target_address; --delay reg input always PC except for inconditional jumps
 
-pc_output <= delay_reg_output when hard_reset = '0'  and external_parallel_load_delay = '0' else x"00000000"; -- Output instruction is only not zero when no external parallel load, or in the cycle before
+pc_output <= delay_reg_output when hard_reset = '0'  and external_parallel_load_delay = '0' else x"00000000"; -- Output instruction is only not zero when no external parallel load in the cycle before
 ins_output_internal <= IRAM_output when hard_reset = '0'  and external_parallel_load_delay = '0' and stall_delayed = '0' else
-              delayed_ins_output_reg when stall_delayed = '1' else x"00000000";
+              delayed_ins_output_reg when stall_delayed = '1' and external_parallel_load_delay = '0'  else x"00000000";
 
 process(clk) begin      -- Delay register for enable parallel load
 if(rising_edge(clk)) then

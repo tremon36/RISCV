@@ -41,13 +41,23 @@ end component RegistroF;
 
 component Single_port_RAM
 port(
- RAM_ADDR: in std_logic_vector(6 downto 0); -- Address to write/read RAM
+ RAM_ADDR: in std_logic_vector(14 downto 0); -- Address to write/read RAM
  RAM_DATA_IN: in std_logic_vector(7 downto 0); -- Data to write into RAM
  RAM_WR: in std_logic; -- Write enable 
  RAM_CLOCK: in std_logic; -- clock input for RAM
  RAM_DATA_OUT: out std_logic_vector(7 downto 0) -- Data output of RAM
 );
 end component Single_port_RAM;
+
+component low_capacity_RAM is
+port(
+ RAM_ADDR: in std_logic_vector(12 downto 0); -- Address to write/read RAM
+ RAM_DATA_IN: in std_logic_vector(7 downto 0); -- Data to write into RAM
+ RAM_WR: in std_logic; -- Write enable 
+ RAM_CLOCK: in std_logic; -- clock input for RAM
+ RAM_DATA_OUT: out std_logic_vector(7 downto 0) -- Data output of RAM
+);
+end component low_capacity_RAM;
 
 --INTERFAZ PARA MEMORIA RAM
 
@@ -57,12 +67,13 @@ component memory_manager is
         rw  : in std_logic;
         byte_amount : in std_logic_vector(1 downto 0);
         write_data: in std_logic_vector(31 downto 0);
-        requested_address: in std_logic_vector(8 downto 0);
+        requested_address: in std_logic_vector(17 downto 0);
         response_data1,response_data2,response_data3,response_data4 : in std_logic_vector(7 downto 0);
+        lowc_ram_1_response,lowc_ram_2_response,lowc_ram_3_response,lowc_ram_4_response: in std_logic_vector(7 downto 0);
         write_data1,write_data2,write_data3,write_data4 : out std_logic_vector(7 downto 0);
-        request_adress_forward_1,request_adress_forward_2,request_adress_forward_3,request_adress_forward_4: out std_logic_vector(6 downto 0);
+        request_adress_forward: out std_logic_vector(14 downto 0);
         data_output_32_bit: out std_logic_vector(31 downto 0);
-        write_data_enable: out std_logic_vector(3 downto 0)
+        write_data_enable: out std_logic_vector(7 downto 0)
     );
 end component memory_manager;
 
@@ -283,10 +294,13 @@ signal iram1_response,iram2_response,iram3_response,iram4_response : std_logic_v
 
 --signals de la memoria de datos
 
-signal memory_manager_forwarded_address_4,memory_manager_forwarded_address_3,memory_manager_forwarded_address_2,memory_manager_forwarded_address_1: std_logic_vector(31 downto 0);
+signal memory_manager_forwarded_address: std_logic_vector(31 downto 0);
 signal ram_1_response,ram_2_response,ram_3_response,ram_4_response: std_logic_vector(7 downto 0);
+signal lowc_ram_1_response,lowc_ram_2_response,lowc_ram_3_response,lowc_ram_4_response: std_logic_vector(7 downto 0);
+signal merge_ram_1_response,merge_ram_2_response,merge_ram_3_response,merge_ram_4_response: std_logic_vector(7 downto 0);
 signal ram_1_write_data,ram_2_write_data,ram_3_write_data,ram_4_write_data: std_logic_vector(7 downto 0);
-signal ram_enables: std_logic_vector(3 downto 0);
+signal ram_enables: std_logic_vector(7 downto 0);
+signal highest_address_bit_delay: std_logic; 
 
 
 
@@ -399,7 +413,7 @@ begin
    -- memorias de datos
         
    ram_1: Single_port_RAM port map(
-        memory_manager_forwarded_address_1(6 downto 0),                   -- Direccion de memoria que viene del memory manager
+        memory_manager_forwarded_address(14 downto 0),                   -- Direccion de memoria que viene del memory manager
         ram_1_write_data,                                                 -- Datos que memory manager desea escribir
         ram_enables(0),                                                   -- Enable de escritura en memoria, lo proporciona memory manager
         clk,
@@ -407,7 +421,7 @@ begin
         );
 
    ram_2: Single_port_RAM port map(
-        memory_manager_forwarded_address_2(6 downto 0),                   -- Direccion de memoria que viene del memory manager
+        memory_manager_forwarded_address(14 downto 0),                   -- Direccion de memoria que viene del memory manager
         ram_2_write_data,                                                 -- Datos que memory manager desea escribir
         ram_enables(1),                                                   -- Enable de escritura en memoria, lo proporciona memory manager
         clk,
@@ -415,7 +429,7 @@ begin
         );   
 
    ram_3: Single_port_RAM port map(
-        memory_manager_forwarded_address_3(6 downto 0),                   -- Direccion de memoria que viene del memory manager
+        memory_manager_forwarded_address(14 downto 0),                   -- Direccion de memoria que viene del memory manager
         ram_3_write_data,                                                 -- Datos que memory manager desea escribir
         ram_enables(2),                                                   -- Enable de escritura en memoria, lo proporciona memory manager
         clk,
@@ -423,25 +437,58 @@ begin
         );   
 
    ram_4: Single_port_RAM port map(
-        memory_manager_forwarded_address_4(6 downto 0),                   -- Direccion de memoria que viene del memory manager
+        memory_manager_forwarded_address(14 downto 0),                   -- Direccion de memoria que viene del memory manager
         ram_4_write_data,                                                 -- Datos que memory manager desea escribir
         ram_enables(3),                                                   -- Enable de escritura en memoria, lo proporciona memory manager
         clk,
         ram_4_response                                                    -- Resultado de la busqueda en la memoria, se pasa a memory manager
-        );                                             
+        );
+
+   low_capacity_RAM_1 : low_capacity_RAM port map(
+        memory_manager_forwarded_address(12 downto 0),                      -- Solamente tiene 13 bits la de poca capacidad
+        ram_1_write_data,
+        ram_enables(4),            
+        clk,
+        lowc_ram_1_response
+   );
+
+   low_capacity_RAM_2 : low_capacity_RAM port map(
+        memory_manager_forwarded_address(12 downto 0),                      -- Solamente tiene 13 bits la de poca capacidad
+        ram_2_write_data,
+        ram_enables(5),            
+        clk,
+        lowc_ram_2_response
+   ); 
+
+   low_capacity_RAM_3 : low_capacity_RAM port map(
+        memory_manager_forwarded_address(12 downto 0),                      -- Solamente tiene 13 bits la de poca capacidad
+        ram_3_write_data,
+        ram_enables(6),            
+        clk,
+        lowc_ram_3_response
+   ); 
+
+   low_capacity_RAM_4 : low_capacity_RAM port map(
+        memory_manager_forwarded_address(12 downto 0),                      -- Solamente tiene 13 bits la de poca capacidad
+        ram_4_write_data,
+        ram_enables(7),                                                     -- if highest bit of memory address is 1, then search on low capacity RAM
+        clk,
+        lowc_ram_4_response
+   );
+
+
+
     
   interfaz_RAM: memory_manager port map(
         clk,'0',reset,                                                                  -- At least for now, this phase never stalls
         rw_memory,                                                                      -- Enable de escritura en memoria, lo proporciona la etapa memory
         bytes_to_write_memory,                                                          -- Cantidad de bits a escribir (00 -> 8 bit, 01 -> 16 bit, else 32 bit). Lo proporciona memory
         memory_data_to_write,                                                           -- Datos a escribir en memoria, lo proporciona memory
-        memory_dir(8 downto 0),                                                         -- Direccion en la que escribir en memoria, lo proporciona memory
+        memory_dir(17 downto 0),                                                         -- Direccion en la que escribir en memoria, lo proporciona memory
         ram_1_response,ram_2_response,ram_3_response,ram_4_response,                    -- Respuestas de las memorias RAM, contienen datos a juntar. 
+        lowc_ram_1_response,lowc_ram_2_response,lowc_ram_3_response,lowc_ram_4_response, -- datos enviados por las memorias de poca capacidad
         ram_1_write_data,ram_2_write_data,ram_3_write_data,ram_4_write_data,            -- Datos separados enviados a cada banco RAM para escribir en ellos
-        memory_manager_forwarded_address_1(6 downto 0),                                             -- Direccion en la que escribir en memoria, reenviado por la interfaz a cada RAM
-        memory_manager_forwarded_address_2(6 downto 0), 
-        memory_manager_forwarded_address_3(6 downto 0), 
-        memory_manager_forwarded_address_4(6 downto 0), 
+        memory_manager_forwarded_address(14 downto 0),                                   -- Direccion en la que escribir en memoria, reenviado por la interfaz a cada RAM
         memory_data_to_read,                                                            -- Datos leidos de la RAM, se envian a memory
         ram_enables                                                                     -- Enable de escritura de las 4 RAM. la cuarta contiene la direccion mas pequeña
   );

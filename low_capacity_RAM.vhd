@@ -4,19 +4,19 @@ USE ieee.numeric_std.ALL;
 use ieee.std_logic_unsigned.all;
 
 -- A 128x8 single-port RAM in VHDL
-entity Single_port_RAM is
+entity low_capacity_RAM is
 port(
- RAM_ADDR: in std_logic_vector(14 downto 0); -- Address to write/read RAM
+ RAM_ADDR: in std_logic_vector(12 downto 0); -- Address to write/read RAM
  RAM_DATA_IN: in std_logic_vector(7 downto 0); -- Data to write into RAM
  RAM_WR: in std_logic; -- Write enable 
  RAM_CLOCK: in std_logic; -- clock input for RAM
  RAM_DATA_OUT: out std_logic_vector(7 downto 0) -- Data output of RAM
 );
-end Single_port_RAM;
+end low_capacity_RAM;
 
-architecture Behavioral of Single_port_RAM is
+architecture Behavioral of low_capacity_RAM is
 -- define the new type for the 128x8 RAM 
-type RAM_ARRAY is array (0 to 32767) of std_logic_vector (7 downto 0);
+type RAM_ARRAY is array (0 to 8191) of std_logic_vector (7 downto 0);
 -- initial values in the RAM
 signal RAM: RAM_ARRAY;
 
