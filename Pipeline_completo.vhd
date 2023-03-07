@@ -6,7 +6,9 @@ entity Pipeline_completo is
         reset,clk: in std_logic;
         debug_read_reg_addr: in std_logic_vector(4 downto 0);
         Anode_Activate : out STD_LOGIC_VECTOR (3 downto 0);-- 4 Anode signals
-        LED_out : out STD_LOGIC_VECTOR (6 downto 0)
+        LED_out : out STD_LOGIC_VECTOR (6 downto 0);
+        hsync,vsync: out std_logic;
+        rgb: out std_logic_vector(11 downto 0)
         );
 end Pipeline_completo;
 
@@ -37,17 +39,21 @@ component RegistroF
         );        
 end component RegistroF;
 
---MEMORIA RAM 
+-- MEMORIA RAM 
 
-component Single_port_RAM
+component Dual_port_RAM is
 port(
  RAM_ADDR: in std_logic_vector(14 downto 0); -- Address to write/read RAM
+ RAM_ADDR2: in std_logic_vector(14 downto 0); -- Address to write/read RAM, port 2
  RAM_DATA_IN: in std_logic_vector(7 downto 0); -- Data to write into RAM
- RAM_WR: in std_logic; -- Write enable 
+ RAM_DATA_IN2: in std_logic_vector(7 downto 0); -- Data to write into RAM, port 2
+ RAM_WR: in std_logic; -- Write enable
+ RAM_WR2: in std_logic; -- Write enable, port 2  
  RAM_CLOCK: in std_logic; -- clock input for RAM
- RAM_DATA_OUT: out std_logic_vector(7 downto 0) -- Data output of RAM
+ RAM_DATA_OUT: out std_logic_vector(7 downto 0); -- Data output of RAM
+ RAM_DATA_OUT2: out std_logic_vector(7 downto 0) -- Data output of RAM, port 2
 );
-end component Single_port_RAM;
+end component Dual_port_RAM;
 
 component low_capacity_RAM is
 port(
@@ -155,6 +161,18 @@ component Registros is
         debug_read_reg_addr: in std_logic_vector(4 downto 0) -- DEBUG
     );
     end component;
+
+-- VGA memory interface and output 
+
+component vga_controller_memory_interface is
+    port(
+        reset,clk: in std_logic;
+        hsync,vsync: out std_logic;
+        rgb: out std_logic_vector(11 downto 0);
+        r1,r2,r3,r4: out std_logic_vector(14 downto 0);
+        resp_1,resp_2,resp_3,resp_4: in std_logic_vector(7 downto 0)
+    );
+end component vga_controller_memory_interface;
 
 
 --FETCH 
@@ -302,6 +320,9 @@ signal ram_1_write_data,ram_2_write_data,ram_3_write_data,ram_4_write_data: std_
 signal ram_enables: std_logic_vector(7 downto 0);
 signal highest_address_bit_delay: std_logic; 
 
+signal read_addr_r1_port2,read_addr_r2_port2,read_addr_r3_port2,read_addr_r4_port2: std_logic_vector(14 downto 0);
+signal data_response_r1_port2,data_response_r2_port2,data_response_r3_port2,data_response_r4_port2 : std_logic_vector(7 downto 0);
+
 
 
 begin
@@ -412,36 +433,52 @@ begin
     );
    -- memorias de datos
         
-   ram_1: Single_port_RAM port map(
+   ram_1: Dual_port_RAM port map(
         memory_manager_forwarded_address(14 downto 0),                   -- Direccion de memoria que viene del memory manager
+        read_addr_r1_port2,                                              -- Direccion de memoria que busca VGA controller memory interface en el puerto 2
         ram_1_write_data,                                                 -- Datos que memory manager desea escribir
+        x"00",                                                            -- Puero 2 es solo para lectura del frame, nunca se escribe
         ram_enables(0),                                                   -- Enable de escritura en memoria, lo proporciona memory manager
+        '0',                                                              -- Puerto 2 es solo para la lectura del frame, nunca se escribe
         clk,
-        ram_1_response                                                    -- Resultado de la busqueda en la memoria, se pasa a memory manager
+        ram_1_response,                                                   -- Resultado de la busqueda en la memoria, se pasa a memory manager
+        data_response_r1_port2                                            -- Resultado de la busqueda en memoria, se envia a VGA controller memory interface
         );
 
-   ram_2: Single_port_RAM port map(
+   ram_2: Dual_port_RAM port map(
         memory_manager_forwarded_address(14 downto 0),                   -- Direccion de memoria que viene del memory manager
+        read_addr_r2_port2,                                              -- Direccion de memoria que busca VGA controller memory interface en el puerto 2
         ram_2_write_data,                                                 -- Datos que memory manager desea escribir
+        x"00",                                                            -- Puero 2 es solo para lectura del frame, nunca se escribe
         ram_enables(1),                                                   -- Enable de escritura en memoria, lo proporciona memory manager
+        '0',                                                              -- Puerto 2 es solo para la lectura del frame, nunca se escribe
         clk,
-        ram_2_response                                                    -- Resultado de la busqueda en la memoria, se pasa a memory manager
+        ram_2_response,                                                    -- Resultado de la busqueda en la memoria, se pasa a memory manager
+        data_response_r2_port2                                            -- Resultado de la busqueda en memoria, se envia a VGA controller memory interface
         );   
 
-   ram_3: Single_port_RAM port map(
+   ram_3: Dual_port_RAM port map(
         memory_manager_forwarded_address(14 downto 0),                   -- Direccion de memoria que viene del memory manager
+        read_addr_r3_port2,                                              -- Direccion de memoria que busca VGA controller memory interface en el puerto 2
         ram_3_write_data,                                                 -- Datos que memory manager desea escribir
+        x"00",                                                            -- Puero 2 es solo para lectura del frame, nunca se escribe
         ram_enables(2),                                                   -- Enable de escritura en memoria, lo proporciona memory manager
+        '0',                                                              -- Puerto 2 es solo para la lectura del frame, nunca se escribe
         clk,
-        ram_3_response                                                    -- Resultado de la busqueda en la memoria, se pasa a memory manager
+        ram_3_response,                                                    -- Resultado de la busqueda en la memoria, se pasa a memory manager
+        data_response_r3_port2                                            -- Resultado de la busqueda en memoria, se envia a VGA controller memory interface
         );   
 
-   ram_4: Single_port_RAM port map(
+   ram_4: Dual_port_RAM port map(
         memory_manager_forwarded_address(14 downto 0),                   -- Direccion de memoria que viene del memory manager
+        read_addr_r4_port2,                                              -- Direccion de memoria que busca VGA controller memory interface en el puerto 2
         ram_4_write_data,                                                 -- Datos que memory manager desea escribir
+        x"00",                                                            -- Puero 2 es solo para lectura del frame, nunca se escribe
         ram_enables(3),                                                   -- Enable de escritura en memoria, lo proporciona memory manager
+        '0',                                                              -- Puerto 2 es solo para la lectura del frame, nunca se escribe
         clk,
-        ram_4_response                                                    -- Resultado de la busqueda en la memoria, se pasa a memory manager
+        ram_4_response,                                                    -- Resultado de la busqueda en la memoria, se pasa a memory manager
+        data_response_r4_port2                                            -- Resultado de la busqueda en memoria, se envia a VGA controller memory interface
         );
 
    low_capacity_RAM_1 : low_capacity_RAM port map(
@@ -466,7 +503,7 @@ begin
         ram_enables(6),            
         clk,
         lowc_ram_3_response
-   ); 
+   );
 
    low_capacity_RAM_4 : low_capacity_RAM port map(
         memory_manager_forwarded_address(12 downto 0),                      -- Solamente tiene 13 bits la de poca capacidad
@@ -515,6 +552,23 @@ begin
        debug_read_reg_addr
    
    );
+
+    vga: vga_controller_memory_interface port map(
+        reset,
+        clk,
+        hsync,
+        vsync,
+        rgb,
+        read_addr_r1_port2,
+        read_addr_r2_port2,
+        read_addr_r3_port2,
+        read_addr_r4_port2,
+        data_response_r1_port2,
+        data_response_r2_port2,
+        data_response_r3_port2,
+        data_response_r4_port2
+    );
+
    
    --display de 7 segmentos
    
