@@ -4,9 +4,9 @@ use IEEE.std_logic_unsigned.all;
 entity seven_segment_display_VHDL is
     Port ( clk : in STD_LOGIC;-- 100Mhz clock on Basys 3 FPGA board
            reset : in STD_LOGIC; -- reset
-           Anode_Activate : out STD_LOGIC_VECTOR (3 downto 0);-- 4 Anode signals
+           Anode_Activate : out STD_LOGIC_VECTOR (7 downto 0);-- 4 Anode signals
            LED_out : out STD_LOGIC_VECTOR (6 downto 0);-- Cathode patterns of 7-segment display
-           displayed_number: in STD_LOGIC_VECTOR (15 downto 0));
+           displayed_number: in STD_LOGIC_VECTOR (31 downto 0));
 end seven_segment_display_VHDL;
 
 architecture Behavioral of seven_segment_display_VHDL is
@@ -18,7 +18,7 @@ signal one_second_enable: std_logic;
 signal LED_BCD: STD_LOGIC_VECTOR (3 downto 0);
 signal refresh_counter: STD_LOGIC_VECTOR (19 downto 0);
 -- creating 10.5ms refresh period
-signal LED_activating_counter: std_logic_vector(1 downto 0);
+signal LED_activating_counter: std_logic_vector(2 downto 0);
 -- the other 2-bit for creating 4 LED-activating signals
 -- count         0    ->  1  ->  2  ->  3
 -- activates    LED1    LED2   LED3   LED4
@@ -60,33 +60,39 @@ begin
         refresh_counter <= refresh_counter + 1;
     end if;
 end process;
- LED_activating_counter <= refresh_counter(19 downto 18);
+ LED_activating_counter <= refresh_counter(19 downto 17);
 -- 4-to-1 MUX to generate anode activating signals for 4 LEDs 
 process(LED_activating_counter)
 begin
     case LED_activating_counter is
-    when "00" =>
-        Anode_Activate <= "0111"; 
-        -- activate LED1 and Deactivate LED2, LED3, LED4
+    when "000" =>
+        Anode_Activate <= "01111111"; 
+        LED_BCD <= displayed_number(31 downto 28);
+    when "001" =>
+        Anode_Activate <= "10111111"; 
+        LED_BCD <= displayed_number(27 downto 24);
+    when "010" =>
+        Anode_Activate <= "11011111"; 
+        LED_BCD <= displayed_number(23 downto 20);
+    when "011" =>
+        Anode_Activate <= "11101111"; 
+        LED_BCD <= displayed_number(19 downto 16);
+    when "100" =>
+        Anode_Activate <= "11110111"; 
         LED_BCD <= displayed_number(15 downto 12);
-        -- the first hex digit of the 16-bit number
-    when "01" =>
-        Anode_Activate <= "1011"; 
-        -- activate LED2 and Deactivate LED1, LED3, LED4
+    when "101" => 
+        Anode_Activate <= "11111011"; 
         LED_BCD <= displayed_number(11 downto 8);
-        -- the second hex digit of the 16-bit number
-    when "10" =>
-        Anode_Activate <= "1101"; 
-        -- activate LED3 and Deactivate LED2, LED1, LED4
+    when "110" => 
+        Anode_Activate <= "11111101"; 
         LED_BCD <= displayed_number(7 downto 4);
-        -- the third hex digit of the 16-bit number
-    when "11" =>
-        Anode_Activate <= "1110"; 
-        -- activate LED4 and Deactivate LED2, LED3, LED1
+    when "111" => 
+        Anode_Activate <= "11111110"; 
         LED_BCD <= displayed_number(3 downto 0);
-        -- the fourth hex digit of the 16-bit number    
-    when others => Anode_Activate<="1110";
-    LED_BCD <= displayed_number(3 downto 0);
+        
+    when others => 
+        Anode_Activate <= "11111110"; 
+        LED_BCD <= displayed_number(3 downto 0);
     end case;
 end process;
 end Behavioral;

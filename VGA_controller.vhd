@@ -45,12 +45,14 @@ begin
 
   
   process(clk_25,clk,reset) begin
-  if(reset = '1') then 
-    h_count <= "0000000000";
-    v_count <= "0000000000";
-    rgb_usage <= "00";
-    RAM_REQUEST_INTERNAL <= x"0000" & '0';
-  elsif(rising_edge(clk_25)) then 
+  
+  if(rising_edge(clk_25)) then 
+    if(reset = '1') then 
+      h_count <= "0000000000";
+      v_count <= "0000000000";
+      rgb_usage <= "00";
+      RAM_REQUEST_INTERNAL <= x"0000" & '0';
+    else 
     
     if(h_count = "1100011111") then -- 799
         
@@ -76,6 +78,7 @@ begin
     end if; 
 
   end if; 
+end if;
   end process;
 
   -- register for delayed output signals (RAM takes 10 ns to read), so RAM output is aligned with hsync,vsync,image_on 

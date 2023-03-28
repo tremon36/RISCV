@@ -46,52 +46,67 @@ begin
 
 process(mainClock) begin 
 if(rising_edge(mainClock)) then 
-if(mainReset = '1') then 
-regfile <= (              --reset all registers
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000",
- x"00000000");
-flagfile <= ('0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0');
-
-elsif(writeEnable = '1') then  -- write data and reset flag on write
+--if(mainReset = '1') then 
+--regfile <= (              --reset all registers
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000",
+-- x"00000000");
+----flagfile <= ('0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0');
+--
+if(writeEnable = '1') then  -- write data and reset flag on write
 regfile(to_integer(unsigned(writeAddress))) <= w_dataBus;
-flagfile(to_integer(unsigned(writeAddress))) <= '0';
+--flagfile(to_integer(unsigned(writeAddress))) <= '0';
 end if;
-if(destinationEnable ='1') then 
-flagfile(to_integer(unsigned(destinationRegister))) <= '1';
-end if;
+--if(destinationEnable ='1') then 
+--flagfile(to_integer(unsigned(destinationRegister))) <= '1';
+--end if;
 
 end if;
 end process;
+
+process(mainClock) begin 
+    if(rising_edge(mainClock)) then 
+    if(mainReset = '1') then 
+        flagfile <= ('0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0');
+    
+    elsif(writeEnable = '1') then  -- write data and reset flag on write
+        flagfile(to_integer(unsigned(writeAddress))) <= '0';
+    end if;
+    if(destinationEnable ='1') then 
+        flagfile(to_integer(unsigned(destinationRegister))) <= '1';
+    end if;
+    
+    end if;
+    end process;
 
 -- Read registers
 r_dataBus1 <= regfile(to_integer(unsigned(readAddress1))) when readEnable1 = '1' and readAddress1 /= x"00000000" else x"00000000";

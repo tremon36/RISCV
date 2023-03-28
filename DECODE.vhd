@@ -141,6 +141,37 @@ process(clock,instruction,data_rs1,data_rs2,reset,stall,OPCODE,SUBOPCODE) begin
               rd_dir<= instruction(11 downto 7);
               resultado <= data_rs1 & data_rs2 & "00000" & instruction(31 downto 25) & instruction (11 downto 7) & instruction(14 downto 12) & instruction(6 downto 0);
               --              OP1        OP2     ---------- OFFSET = TAG -----------           RD                          SUBOPCODE                   OPCODE
+        
+        when "1110011" => -- Instrucciones para CSR (Control status registers)
+
+              case SUBOPCODE is 
+              
+              when "001" | "010" |"011"  => -- csrrw,csrrs,csrrc
+                rs1_dir <= instruction(19 downto 15);
+                rs2_dir <= "00000";
+                register_r <= '1';
+                will_write_flag <=  reset nor stall;
+                rd_dir <= instruction(11 downto 7);
+                resultado <= data_rs1 & x"00000000" & instruction(31 downto 20) & instruction(11 downto 7) & instruction(14 downto 12) & instruction(6 downto 0);
+                            -- OP1 --  -- NO OP2 --  -- OFFSET = CSR ADDRESS --   --      RD            --   --      SUBOPCODE      --          OPCODE 
+
+              when "101" | "110" | "111" => -- csrrwi,csrrsi,csrrci
+                rs1_dir <= "00000";
+                rs2_dir <= "00000";
+                register_r <= '0';
+                will_write_flag <=  reset nor stall;
+                rd_dir <= instruction(11 downto 7);
+                resultado <= x"000000"&"000"&instruction(19 downto 15) & x"00000000" & instruction(31 downto 20) & instruction(11 downto 7) & instruction(14 downto 12) & instruction(6 downto 0);
+                            --              OP1                     --  -- NO OP2 --  -- OFFSET = CSR ADDRESS --   --      RD            --   --      SUBOPCODE      --          OPCODE 
+              when others => -- NOP
+                rs1_dir <= "00000";
+                rs2_dir <= "00000";
+                register_r<='0';
+                will_write_flag <= '0';
+                rd_dir<= "00000";
+                resultado <=  x"0000000000000000000000" & "000";
+              
+              end case;
               
               
         when others => -- NO OPERATION
