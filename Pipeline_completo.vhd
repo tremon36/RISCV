@@ -3,7 +3,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 
 entity Pipeline_completo is
     port(
-        reset,clk: in std_logic;
+        reset,clk,csr_module_interrupt_input: in std_logic;
         debug_read_reg_addr: in std_logic_vector(4 downto 0);
         Anode_Activate : out STD_LOGIC_VECTOR (7 downto 0);-- 4 Anode signals
         LED_out : out STD_LOGIC_VECTOR (6 downto 0);
@@ -16,6 +16,12 @@ architecture Behavioral of Pipeline_completo is
 
  -- DEBUG signal
  signal debug_data_output: std_logic_vector(31 downto 0);
+
+ -- Señales globales del pipeline
+signal ISR_context : std_logic; 
+signal csr_module_interrupt_input_internal : std_logic;
+signal prev_interrupt_input: std_logic;
+signal int_pulse: std_logic;
 
 -- display de 7 segmentos
 signal displayed_number : std_logic_vector (31 downto 0);
@@ -33,6 +39,8 @@ signal rs1_dir,rs2_dir,rd_dir: std_logic_vector(4 downto 0);
 signal rs1_busy_flag,rs2_busy_flag,dest_reg_busy_flag: std_logic;
 signal fetch_branch_prediction_address: std_logic_vector(31 downto 0);
 signal fetch_enable_parallel_cp: std_logic;
+signal invalidate_out_fetch: std_logic;
+signal invalidate_fetch: std_logic;
 
 -- signals de decode
 signal stall_decode,reset_decode,stall_prev,read_from_register_UNASSIGNED: std_logic;
@@ -40,17 +48,23 @@ signal data_rs1,data_rs2,instruction_pointer_salida_decode: std_logic_vector(31 
 signal rs1_dir_UNASSIGNED,rs2_dir_UNASSIGNED,rd_dir_UNASSIGNED: std_logic_vector(4 downto 0);
 signal decoded_instruction: std_logic_vector(90 downto 0);
 signal will_write_flag_decode:std_logic;
+signal invalidate_decode,invalidate_out_decode: std_logic;
+signal is_empty_decode: std_logic;
 
 -- signals de jump 
 signal stall_jump,reset_jump,reset_prev_to_jump: std_logic;
 signal decoded_instruction_jump: std_logic_vector(90 downto 0);
 signal jump_instruction_pointer,instruction_pointer_salida_jump,jump_result: std_logic_vector(31 downto 0);
 signal enable_parallel_load_jump: std_logic;
+signal invalidate_jump,invalidate_out_jump: std_logic;
+signal is_empty_jump: std_logic;
+signal exit_ISR: std_logic;
 
 -- signals de execute 
 signal stall_exe,reset_exe,stall_previous_exe:std_logic;
 signal instruction_pointer_salida_exe: std_logic_vector(31 downto 0);
 signal decoded_instruction_exe: std_logic_vector(90 downto 0);
+signal invalidate_exe,invalidate_out_exe: std_logic;
 
 -- signals de memory 
 signal stall_memory,reset_memory:std_logic;
@@ -58,6 +72,7 @@ signal memory_dir,memory_data_to_write,memory_data_to_read: std_logic_vector(31 
 signal rw_memory,stall_previous_memory: std_logic;
 signal decoded_instruction_memory: std_logic_vector(90 downto 0);
 signal bytes_to_write_memory: std_logic_vector(1 downto 0);
+signal invalidate_memory,invalidate_out_memory: std_logic;
 
 -- signals de write 
 
@@ -65,6 +80,7 @@ signal reset_write: std_logic;
 signal stall_write,enable_write_to_registers: std_logic;
 signal data_to_write_to_registers: std_logic_vector(31 downto 0);
 signal register_direction_to_write: std_logic_vector(4 downto 0);
+signal invalidate_write,invalidate_out_write: std_logic;
 
 
 -- signals de la memoria de instrucciones 
@@ -87,26 +103,32 @@ signal data_response_r1_port2,data_response_r2_port2,data_response_r3_port2,data
 
 -- signals para los control and status registers
 
-signal csr_module_interrupt_input,csr_module_launch_ISR,write_csr : std_logic;
+signal csr_module_launch_ISR,write_csr : std_logic;
 signal csr_module_pc_to_save,csr_module_mepc,csr_bitmask,csr_write_data,csr_read_data: std_logic_vector(31 downto 0);
 signal csr_module_interrupt_cause : std_logic_vector(4 downto 0);
 signal csr_module_mret_executed: std_logic;
 signal csr_address: std_logic_vector(11 downto 0);
 
 
+
 begin
+
+     -- @TODO replace with correct value
+     csr_module_interrupt_cause <= "00000";
 
     
     fetch_stage: entity work.FETCH port map(
         stall_fetch,                                   
         reset,                                          -- No es necesario un reset al saltar para esta etapa (enable parallel hace esa funcion)                                
         clk,
-        enable_parallel_load_jump,                      -- enable de carga paralela de una direccion en el contador de programa (lo envia jump)
-        jump_result,                                    -- direccion a cargar en el contador de programa si el enable anterior esta activo
+        enable_parallel_load_jump,                         -- enable de carga paralela de una direccion en el contador de programa (lo envia jump o interrupcion)
+        jump_result,                          -- direccion a cargar en el contador de programa si el enable anterior esta activo
         instruccion_actual_entrada_fetch,               -- resultado de la busqueda en memoria de la instruccion, se envía directamente al pipeline
         instruction_pointer_PC,                         -- direccion en la que buscar una instruccion en memoria, se envia a IRAM_memory_manager
         instruccion_salida_fetch,                       -- salida de la instruccion actual al pipeline, se envia a decode
-        instruction_pointer_salida_fetch                -- Contador de programa asociado a la instruccion que se pasa por el pipeline
+        instruction_pointer_salida_fetch,               -- Contador de programa asociado a la instruccion que se pasa por el pipeline
+        invalidate_fetch,                               -- Invalidar la instruccion de la que se esta haciendo fetch. Señal externa para interrupciones
+        invalidate_out_fetch                            -- Flag de invalidacion de salida de la instruccion
         );
 
     
@@ -122,9 +144,13 @@ begin
             rd_dir,                 -- Direccion del registro de destino (rd) (desde 0 a 31)
             stall_prev,                         -- Parar las etapas anteriores si hay riesgo RAW
             read_from_register_UNASSIGNED,      -- Indicar al banco de registros si se va a leer o no
-            decoded_instruction,
-            will_write_flag_decode
-            );                                  -- Instruccion procesada y decodificada, para continuar por el pipeline
+            decoded_instruction,               -- Instruccion procesada y decodificada, para continuar por el pipeline
+            will_write_flag_decode,
+            invalidate_decode,                   -- Inmediately (asynchronously) invalidate the current instruction in the decode stage
+            invalidate_out_fetch,              
+            invalidate_out_decode,
+            is_empty_decode
+            );                                  
             
     jump_stage: entity work.JUMP port map(
             reset_jump,
@@ -133,9 +159,17 @@ begin
             decoded_instruction,                -- Instruccion decodificada que viene de la etapa decode
             decoded_instruction_jump,           -- Reenviar la instruccion decodificada por el pipeline, un ciclo despues de que llegue
             instruction_pointer_salida_decode,  -- PC asociado a la instruccion que esta pasando por la etapa
+            csr_module_mepc,
             jump_result,                        -- Direccion de instruccion a la que saltar de ser necesario (es el valor de parallel load del PC)
             reset_prev_to_jump,                 -- Resetear las etapas anteriores si se salta, pues contienen instrucciones que no hay que ejecutar
-            enable_parallel_load_jump);         -- Indicar al PC si debe ejecutar el salto (hacer carga paralela)
+            enable_parallel_load_jump,          -- Indicar al PC si debe ejecutar el salto (hacer carga paralela)
+            invalidate_jump,                    -- Inmediately (asynchronously) invalidate the current instruction in the jump stage
+            invalidate_out_decode,
+            invalidate_out_jump,
+            is_empty_jump,                       -- Indicates whether jump is processing an instruction or not. Used for interrupt and exception handling
+            exit_ISR                             -- Sent to the CSR module when MRET instruction executes its jump stage
+            
+            );         
             
             
     execute_stage: entity work.EXE port map(                    -- Campos de la instruccion decodificada
@@ -150,7 +184,12 @@ begin
            stall_exe,
            instruction_pointer_salida_jump,
            stall_previous_exe,
-           decoded_instruction_exe);                -- salida de instruccion de exe para pasar por el pipeline
+           decoded_instruction_exe,                  -- salida de instruccion de exe para pasar por el pipeline
+           invalidate_exe,
+           invalidate_out_jump,
+           invalidate_out_exe
+           
+           );                
            
    memory_stage: entity work.MEMORY port map( 
            stall_memory,
@@ -167,7 +206,11 @@ begin
            csr_address,                            -- CSR address to read/write. Sent to the CSR module
            write_csr,                              -- Enable write on the CSR. Sent to the csr module
            csr_bitmask,                            -- bitmask to write CSR. Sent to the csr module            
-           csr_write_data                          -- data to be written in CSR. Sent to the csr module
+           csr_write_data,                          -- data to be written in CSR. Sent to the csr module
+
+           invalidate_memory,
+           invalidate_out_exe,
+           invalidate_out_memory
            
            );                 
            
@@ -180,7 +223,12 @@ begin
            csr_read_data,                         -- Datos resultado de leer CSR (los envia modulo CSR)
            data_to_write_to_registers,            -- datos de escritura en registros (mandar a los registros)
            register_direction_to_write,           -- direccion de escritura en los registros
-           enable_write_to_registers);            -- Indicar a los registros si se debe escribir o no
+           enable_write_to_registers,             -- Indicar a los registros si se debe escribir o no
+           invalidate_write,
+           invalidate_out_memory,
+           invalidate_out_write
+           
+           );            
                    
             
    --registros que contienen el contador de programa asociado a la instrucccion que se esta ejecutando en esa etapa del pipeline 
@@ -327,6 +375,7 @@ begin
        rs1_busy_flag,
        rs2_busy_flag,
        dest_reg_busy_flag,
+       invalidate_out_write,                        -- Flag de invalidacion de escritura. Se escriben los flags, pero no los datos
        debug_read_reg_addr
    
    );
@@ -335,12 +384,12 @@ begin
 
    csr: entity work.CSR_module port map(
      reset,clk,
-     csr_module_interrupt_input,            -- Interrupt request sent by the interrupt controller module 
+     csr_module_interrupt_input_internal,   -- Interrupt request sent by the interrupt controller module 
      csr_module_pc_to_save,                 -- Program counter to save in MEPC register when an interrupt happens. Served by jump*
      csr_module_interrupt_cause,            -- Cause of the exception/interruption. Refer to documentation. 
      csr_module_mepc,                       -- Saved program counter to be restored after an ISR ends. MEPC register
-     csr_module_launch_ISR,                 -- Load program counter with interruption vector address request.
-     csr_module_mret_executed,              -- signal sent to restore interruption-related CSR when a MRET instruction is executed in a ISR context
+     invalidate_fetch,                      -- Load program counter with interruption vector address request.
+     exit_ISR,                              -- signal sent to restore interruption-related CSR when a MRET instruction is executed
      write_csr,                             -- flag to write/read csr. 0 = read.Served by memory stage
      csr_bitmask,                           -- bitmask to apply to the write data. Served by memory stage
      csr_address,                           -- address to read/write CSR. Served by memory
@@ -393,8 +442,27 @@ begin
 
    displayed_number <= debug_data_output;
 
+   -- control de invalidaciones
 
-    
+
+   invalidate_decode <= invalidate_fetch; -- Invalidate instruction at decode on ISR
+   invalidate_jump <= invalidate_fetch;   -- Invalidate instruction at jump on ISR
+   invalidate_exe <= '0';
+   invalidate_memory <= '0';
+   invalidate_write <= '0';
+
+   csr_module_pc_to_save <= instruction_pointer_salida_decode when is_empty_jump = '0' else 
+                            instruction_pointer_salida_fetch when is_empty_decode = '0' else 
+                            instruction_pointer_PC;                                            -- Save PC of the instruction at the branch stage when interrupt arrives. If it is empty, go back until
+                                                                                               -- the currently checked stage is not.
+   
+
+    extern_int_handler: entity work.external_interrupts_module port map (  -- Stabilize interrupt for rising edge. Minimun of ten cycles to launch ISR
+               csr_module_interrupt_input,
+               reset,
+               clk,
+               csr_module_interrupt_input_internal
+    );
    
    
 

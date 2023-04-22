@@ -8,7 +8,9 @@ entity FETCH is
         stall,hard_reset,clk,enable_parallel_load_cp: in std_logic;
         pc_parallel_load,IRAM_output: in std_logic_vector(31 downto 0);
         IRAM_addr_request: out std_logic_vector(31 downto 0);
-        ins_output,pc_output: out std_logic_vector(31 downto 0)
+        ins_output,pc_output: out std_logic_vector(31 downto 0);
+        invalidate: in std_logic; -- Basically launch ISR
+        invalidate_out: out std_logic
     );
 end FETCH;
 
@@ -46,19 +48,20 @@ begin
 program_counter: CP port map(not stall,hard_reset,enable_parallel_load_internal,clk,pc_current_num,pc_parallel_load_internal);
 registro_salida: RegistroF port map(hard_reset,stall and not enable_parallel_load_cp,clk,delay_reg_input,delay_reg_output);
 registro_delay_ins: RegistroF port map(hard_reset,stall_delayed,clk,ins_output_internal,delayed_ins_output_reg);
+registro_invalid_flag: entity work.bit_register port map(hard_reset,stall,clk,invalidate,'0',invalidate_out);
 
 ins_output <= ins_output_internal;
 IRAM_addr_request <= target_address when enable_parallel_load_internal = '1' else -- search target address in RAM only for inconditional jumps, else search pc content
                      pc_current_num;                                                                        
 
-pc_parallel_load_internal <= target_address_plus_4 when enable_parallel_load_cp = '0' else pc_parallel_load; -- load pc with internal+4 if inconditional jump, with external load without + 4
+pc_parallel_load_internal <= x"00000030" when invalidate = '1' else target_address_plus_4 when enable_parallel_load_cp = '0' else pc_parallel_load; -- load pc with INT_VEC when exception,internal+4 if inconditional jump, with external load without + 4
 
 target_address_plus_4 <= target_address + x"00000004";
 delay_reg_input <= pc_current_num when enable_parallel_load_internal = '0' or enable_parallel_load_cp = '1' else target_address; --delay reg input always PC except for inconditional jumps
 
 pc_output <= delay_reg_output when hard_reset = '0'  and external_parallel_load_delay = '0' else x"00000000"; -- Output instruction is only not zero when no external parallel load in the cycle before
-ins_output_internal <= IRAM_output when hard_reset = '0'  and external_parallel_load_delay = '0' and stall_delayed = '0' else
-              delayed_ins_output_reg when stall_delayed = '1' and external_parallel_load_delay = '0'  else x"00000000";
+ins_output_internal <= IRAM_output when hard_reset = '0'  and external_parallel_load_delay = '0' and stall_delayed = '0'  else
+              delayed_ins_output_reg when stall_delayed = '1' and external_parallel_load_delay = '0' else x"00000000";
 
 process(clk) begin      -- Delay register for enable parallel load
 if(rising_edge(clk)) then
@@ -80,7 +83,7 @@ target_address <= delay_reg_output + to_sum_offset;
 
 process(clk,enable_parallel_load_cp,pc_parallel_load,IRAM_output,hard_reset,delay_reg_output,pc_current_num,to_sum_offset) begin
 
-    if(enable_parallel_load_cp = '1' or (ins_output_internal(6 downto 0) = "1101111" and hard_reset = '0')) then -- Cargar el contador de programa desde jump o salto inmediato
+    if(enable_parallel_load_cp = '1' or (ins_output_internal(6 downto 0) = "1101111" and hard_reset = '0') or invalidate = '1') then -- Cargar el contador de programa desde jump o salto inmediato
         enable_parallel_load_internal <= '1';
 
     else

@@ -15,7 +15,10 @@ entity WRITE is
         csr_data_response: in std_logic_vector(31 downto 0);
         data_out : out std_logic_vector (31 downto 0);
         dir_out : out std_logic_vector (4 downto 0);
-        write_enable : out std_logic
+        write_enable : out std_logic;
+        invalidate: in std_logic;
+        invalid_flag_prev_stage: in std_logic;
+        invalidate_out: out std_logic
   );
 end WRITE;
 
@@ -28,6 +31,8 @@ begin
 
     OPCODE <= decode_instruction(6 downto 0);
     SUBOPCODE <= decode_instruction(9 downto 7);
+
+    invalidate_out <= invalidate or invalid_flag_prev_stage; -- Invalidation is sent to registers so that only flags are written
     
     process (clk,OPCODE,SUBOPCODE,memory_data_response,decode_instruction)
     begin  

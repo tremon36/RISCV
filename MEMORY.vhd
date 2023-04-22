@@ -15,7 +15,10 @@ entity MEMORY is
         csr_address: out std_logic_vector(11 downto 0);
         csr_write_enable: out std_logic;
         csr_bitmask: out std_logic_vector(31 downto 0);
-        csr_write_data: out std_logic_vector(31 downto 0)
+        csr_write_data: out std_logic_vector(31 downto 0);
+        invalidate: in std_logic;
+        invalid_flag_prev_stage: in std_logic;
+        invalidate_out: out std_logic
         
         );
 end MEMORY;
@@ -42,6 +45,8 @@ OPCODE <= decoded_instruction(6 downto 0);
 SUBOPCODE <= decoded_instruction(9 downto 7);
 
 registro_salida: Registro_Intermedio_Decodificado port map(reset,stall,clk,internal_result,instruction_z);
+registro_invalid_flag: entity work.bit_register port map(reset,stall,clk,invalidate,invalid_flag_prev_stage,invalidate_out);
+
 memory_dir<=decoded_instruction(90 downto 59);
 
 internal_result <= decoded_instruction;
@@ -59,15 +64,15 @@ process(clk,reset,decoded_instruction,SUBOPCODE,OPCODE)
     when "0100011" =>
         case SUBOPCODE is 
             when "000" =>
-            rw <= '1';
+            rw <= '1' and not (invalidate or invalid_flag_prev_stage); -- Check invalid flag to only write into memory if its false. '1' kept for clarity
             memory_to_write<= x"000000"&decoded_instruction(34 downto 27);
             bytes<="00";
             when "001" =>
-            rw <= '1';
+            rw <= '1' and not (invalidate or invalid_flag_prev_stage);
             memory_to_write<=x"0000"&decoded_instruction(42 downto 27);
             bytes<="01";
             when "010" =>
-            rw <= '1';
+            rw <= '1' and not (invalidate or invalid_flag_prev_stage);
             memory_to_write<= decoded_instruction(58 downto 27);
             bytes<="10";
             when others =>
@@ -85,7 +90,7 @@ process(clk,reset,decoded_instruction,SUBOPCODE,OPCODE)
  end process;
 
 process(clk,OPCODE,SUBOPCODE) begin -- CSR process. las lecturas de los CSR, como las de memoria, se mandan directamente a write para evitar el ciclo de latencia
-    if(OPCODE = "1110011") then 
+    if(OPCODE = "1110011" and invalidate = '0' and invalid_flag_prev_stage = '0') then 
         csr_address <= decoded_instruction(26 downto 15);
         case SUBOPCODE(1 downto 0) is 
             when "01" => 
@@ -104,12 +109,15 @@ process(clk,OPCODE,SUBOPCODE) begin -- CSR process. las lecturas de los CSR, com
                 csr_write_enable <= '0';
                 csr_write_data <= x"00000000";
                 csr_bitmask <= x"00000000";
+                csr_address <= x"000";
+                
 
         end case;
     else 
         csr_write_enable <= '0';
         csr_write_data <= x"00000000";
         csr_bitmask <= x"00000000";
+        csr_address <= x"000";
     end if;
 end process;
 

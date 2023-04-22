@@ -10,7 +10,11 @@ entity DECODE is
         rs2_dir,rs1_dir,rd_dir: out std_logic_vector(4 downto 0);
         stall_prev,register_r: out std_logic;
         decoded_instruction: out std_logic_vector(90 downto 0);
-        will_write_flag: out std_logic
+        will_write_flag: out std_logic;
+        invalidate: in std_logic;
+        invalid_flag_prev_stage: in std_logic;
+        invalidate_out: out std_logic;
+        is_empty: out std_logic
         
                 
         --campos de la instruccion decodificada
@@ -43,10 +47,13 @@ signal SUBOPCODE: std_logic_vector(2 downto 0);
 begin
 
 OPCODE <= instruction(6 downto 0);
-SUBOPCODE <= instruction(14 downto 12);
+SUBOPCODE <= instruction(14 downto 12);    
 stall_prev <= '0';
 
+is_empty <= '1' when instruction(6 downto 0) = "0000000" else '0'; -- empty flag to control pipeline flow
+
 registro_salida: Registro_Intermedio_Decodificado port map (reset or stall,stall,clock, resultado,decoded_instruction);
+registro_invalid_flag: entity work.bit_register port map(reset,stall,clock,invalidate,invalid_flag_prev_stage,invalidate_out);
 
 process(clock,instruction,data_rs1,data_rs2,reset,stall,OPCODE,SUBOPCODE) begin      
          
@@ -163,6 +170,15 @@ process(clock,instruction,data_rs1,data_rs2,reset,stall,OPCODE,SUBOPCODE) begin
                 rd_dir <= instruction(11 downto 7);
                 resultado <= x"000000"&"000"&instruction(19 downto 15) & x"00000000" & instruction(31 downto 20) & instruction(11 downto 7) & instruction(14 downto 12) & instruction(6 downto 0);
                             --              OP1                     --  -- NO OP2 --  -- OFFSET = CSR ADDRESS --   --      RD            --   --      SUBOPCODE      --          OPCODE 
+
+              when "000" => -- MRET ( y SRET )
+                rs1_dir <= "00000";
+                rs2_dir <= "00000";
+                register_r<='0';
+                will_write_flag <= '0';
+                rd_dir<= "00000";
+                resultado <= x"000000000000000000000" & "1110011";
+
               when others => -- NOP
                 rs1_dir <= "00000";
                 rs2_dir <= "00000";
@@ -172,6 +188,7 @@ process(clock,instruction,data_rs1,data_rs2,reset,stall,OPCODE,SUBOPCODE) begin
                 resultado <=  x"0000000000000000000000" & "000";
               
               end case;
+              
               
               
         when others => -- NO OPERATION

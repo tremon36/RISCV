@@ -13,7 +13,10 @@ entity EXE is
         reset, stall_in : in std_logic;
         Instructio_pointer : in std_logic_vector (31 downto 0);
         stall_out : out std_logic;
-        z : out std_logic_vector (90 downto 0)
+        z : out std_logic_vector (90 downto 0);
+        invalidate: in std_logic;
+        invalid_flag_prev_stage: in std_logic;
+        invalidate_out: out std_logic
         );
 end EXE;
 architecture Behavioral of EXE is
@@ -59,6 +62,7 @@ signal internal_result: std_logic_vector(90 downto 0);
 signal arithmetic : std_logic;
 signal l_r : std_logic;
 signal z_shift : std_logic_vector (31 downto 0);
+signal output_ins_register: std_logic_vector(90 downto 0);
 
 signal g_u,e_u,l_u,g_s,e_s,l_s : std_logic;
 
@@ -68,7 +72,10 @@ begin
     comp_signed: ESIGNED port map(op1,op2,g_s,e_s,l_s);
     comp_unsigned: EUNSIGNED port map(op1,op2,g_u,e_u,l_u);
 
-    registro_salida: Registro_Intermedio_Decodificado port map (reset,stall_in,clk,internal_result,z);
+    registro_salida: Registro_Intermedio_Decodificado port map (reset,stall_in,clk,output_ins_register,z);
+    registro_invalid_flag: entity work.bit_register port map(reset,stall_in,clk,invalidate,invalid_flag_prev_stage,invalidate_out);
+
+    output_ins_register <= internal_result when (invalidate = '0' and invalid_flag_prev_stage = '0') else op1  & op2 & ofsset & rd & sub_op_code & op_code;
 
     l_r <= sub_op_code(2);
     arithmetic <= ofsset(5);

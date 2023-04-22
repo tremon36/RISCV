@@ -31,6 +31,8 @@ entity Registros is
         r_f2 : out std_logic ;
         r_f3 : out std_logic;
 
+        invalidate_write: in std_logic;
+
         debug_read_reg_addr: in std_logic_vector(4 downto 0) -- DEBUG
     );
 end Registros;
@@ -41,8 +43,11 @@ type reg_array is array (0 to 31) of std_logic_vector (31 downto 0);
 type flag_array is array (0 to 31) of std_logic;
 signal regfile: reg_array;
 signal flagfile: flag_array;
+signal write_data_enable: std_logic;
 
 begin
+
+write_data_enable <= writeEnable and not invalidate_write;
 
 process(mainClock) begin 
 if(rising_edge(mainClock)) then 
@@ -82,7 +87,7 @@ if(rising_edge(mainClock)) then
 -- x"00000000");
 ----flagfile <= ('0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0');
 --
-if(writeEnable = '1') then  -- write data and reset flag on write
+if(write_data_enable = '1') then  -- write data and reset flag on write
 regfile(to_integer(unsigned(writeAddress))) <= w_dataBus;
 --flagfile(to_integer(unsigned(writeAddress))) <= '0';
 end if;
@@ -98,7 +103,7 @@ process(mainClock) begin
     if(mainReset = '1') then 
         flagfile <= ('0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0');
     
-    elsif(writeEnable = '1') then  -- write data and reset flag on write
+    elsif(writeEnable = '1') then  -- write data and reset flag on write. Flags written even when instruction is invalid
         flagfile(to_integer(unsigned(writeAddress))) <= '0';
     end if;
     if(destinationEnable ='1') then 
