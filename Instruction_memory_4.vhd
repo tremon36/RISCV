@@ -24,8 +24,8 @@ begin
 --Algoritmo de la burbuja
 
 RAM <= (
+  x"ff",x"02",x"00",x"00",
   x"00",x"00",x"00",x"00",
-  x"00",x"fe",x"00",x"30",
   x"ff",x"00",x"00",x"00",
   x"00",x"30",x"00",x"00",
 x"fd",x"00",x"00",x"e4",

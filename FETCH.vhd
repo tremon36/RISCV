@@ -54,7 +54,7 @@ ins_output <= ins_output_internal;
 IRAM_addr_request <= target_address when enable_parallel_load_internal = '1' else -- search target address in RAM only for inconditional jumps, else search pc content
                      pc_current_num;                                                                        
 
-pc_parallel_load_internal <= x"00000030" when invalidate = '1' else target_address_plus_4 when enable_parallel_load_cp = '0' else pc_parallel_load; -- load pc with INT_VEC when exception,internal+4 if inconditional jump, with external load without + 4
+pc_parallel_load_internal <= x"00001F40" when invalidate = '1' else target_address_plus_4 when enable_parallel_load_cp = '0' else pc_parallel_load; -- load pc with INT_VEC when exception,internal+4 if inconditional jump, with external load without + 4
 
 target_address_plus_4 <= target_address + x"00000004";
 delay_reg_input <= pc_current_num when enable_parallel_load_internal = '0' or enable_parallel_load_cp = '1' else target_address; --delay reg input always PC except for inconditional jumps

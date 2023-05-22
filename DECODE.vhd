@@ -1,6 +1,7 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.std_logic_signed.all;
+USE IEEE.numeric_std.all;
 
 
 entity DECODE is
@@ -44,7 +45,11 @@ signal resultado: std_logic_vector (90 downto 0);
 signal OPCODE: std_logic_vector(6 downto 0);
 signal SUBOPCODE: std_logic_vector(2 downto 0);
 
+signal vram_offset: std_logic_vector(31 downto 0);
+
 begin
+
+vram_offset <= x"FFFD8000"; -- virtual memory offset, physical address x"00000000" = x"fffd8000"
 
 OPCODE <= instruction(6 downto 0);
 SUBOPCODE <= instruction(14 downto 12);    
@@ -100,8 +105,8 @@ process(clock,instruction,data_rs1,data_rs2,reset,stall,OPCODE,SUBOPCODE) begin
               rs1_dir <= instruction(19 downto 15);
               rs2_dir <= "00000";   
                            
-              resultado <= data_rs1 & X"00000000" & instruction(31 downto 20) & instruction (11 downto 7) & instruction(14 downto 12) & instruction(6 downto 0);
-                         --  BASE       UNS                   OFF                       RD                         SUBOPCODE                  OPCODE
+              resultado <= std_logic_vector(unsigned(data_rs1) - unsigned(vram_offset)) & X"00000000" & instruction(31 downto 20) & instruction (11 downto 7) & instruction(14 downto 12) & instruction(6 downto 0);
+                                                                              --  BASE       UNS                   OFF                       RD                         SUBOPCODE                  OPCODE
               register_r<='1';
               will_write_flag <= '1' and (not reset) and (not stall);
               rd_dir<= instruction(11 downto 7);
@@ -112,8 +117,8 @@ process(clock,instruction,data_rs1,data_rs2,reset,stall,OPCODE,SUBOPCODE) begin
               register_r<='1';
               will_write_flag <= '0';
               rd_dir<= "00000";
-              resultado <= data_rs1 & data_rs2 & instruction(31 downto 25) & instruction(11 downto 7) & "00000" & instruction(14 downto 12) & instruction(6 downto 0);
-                         -- BASE        SRC      --- OFFSET (DIVIDIDO)-------------------------------    RD = 0         SUBOPCODE                  OPCODE  
+              resultado <= std_logic_vector(unsigned(data_rs1) - unsigned(vram_offset)) & data_rs2 & instruction(31 downto 25) & instruction(11 downto 7) & "00000" & instruction(14 downto 12) & instruction(6 downto 0);
+                                                                             -- BASE        SRC      --- OFFSET (DIVIDIDO)-------------------------------    RD = 0         SUBOPCODE                  OPCODE  
                          
          when "0010011" => -- Instrucciones de tipo Inmediato en la ALU
             rs1_dir <= instruction(19 downto 15);

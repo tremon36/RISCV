@@ -134,7 +134,7 @@ begin
                     when x"342" => -- mcause
                         csr_lecture <= mcause;
                     when x"305" => -- mvtec 
-                        csr_lecture <= x"55555554";--DIR_VECTOR_INTERRUPCIONES_32_BIT_ALIGN & "00";
+                        csr_lecture <= x"00001F40";--DIR_VECTOR_INTERRUPCIONES_32_BIT_ALIGN & "00";
                     when x"341" => -- mepc
                         csr_lecture <= mepc;
                     when x"340" => --mscratch

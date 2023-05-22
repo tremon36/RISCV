@@ -1,3 +1,16 @@
+----------------------------------------------------------------------------------
+-- Company: 
+-- Engineer: 
+-- 
+-- Create Date: 04/27/2023 10:16:22 AM
+-- Design Name: 
+-- Module Name: T_flip_flop - Behavioral
+-- Project Name: 
+-- Target Devices: 
+-- Tool Versions: 
+-- Description: 
+-- 
+-- Dependencies: 
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 

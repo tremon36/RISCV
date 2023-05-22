@@ -8,7 +8,11 @@ entity Pipeline_completo is
         Anode_Activate : out STD_LOGIC_VECTOR (7 downto 0);-- 4 Anode signals
         LED_out : out STD_LOGIC_VECTOR (6 downto 0);
         hsync,vsync: out std_logic;
-        rgb: out std_logic_vector(11 downto 0)
+        rgb: out std_logic_vector(11 downto 0);
+        enable_initial_program_load_instr: in std_logic;
+        enable_initial_program_load_data: in std_logic;
+        initial_program_load_addr: in std_logic_vector(17 downto 0);
+        initial_program_load_word: in std_logic_vector(7 downto 0)
         );
 end Pipeline_completo;
 
@@ -87,6 +91,8 @@ signal invalidate_write,invalidate_out_write: std_logic;
 
 signal iram1_addr,iram2_addr,iram3_addr,iram4_addr: std_logic_vector(31 downto 0);
 signal iram1_response,iram2_response,iram3_response,iram4_response : std_logic_vector(7 downto 0);
+signal iram_enables: std_logic_vector(3 downto 0);
+signal iram_requested_address : std_logic_vector(31 downto 0);
 
 -- signals de la memoria de datos
 
@@ -100,6 +106,13 @@ signal highest_address_bit_delay: std_logic;
 
 signal read_addr_r1_port2,read_addr_r2_port2,read_addr_r3_port2,read_addr_r4_port2: std_logic_vector(14 downto 0);
 signal data_response_r1_port2,data_response_r2_port2,data_response_r3_port2,data_response_r4_port2 : std_logic_vector(7 downto 0);
+
+-- signals de memory manager
+
+signal memory_manager_request_addr: std_logic_vector(17 downto 0);
+signal memory_manager_write_data: std_logic_vector(31 downto 0);
+signal memory_manager_rw: std_logic;
+signal memory_manager_byte_amount: std_logic_vector(1 downto 0);
 
 -- signals para los control and status registers
 
@@ -243,20 +256,30 @@ begin
         reset_exe,stall_exe,clk,instruction_pointer_salida_jump,instruction_pointer_salida_exe);
         
    --memoria de instrucciones
-     
-   iram1: entity work.Instruction_memory port map(clk,iram1_addr(6 downto 0),iram1_response);
-   iram2: entity work.Instruction_memory_2 port map(clk,iram2_addr(6 downto 0),iram2_response);  
-   iram3: entity work.Instruction_memory_3 port map(clk,iram3_addr(6 downto 0),iram3_response);  
-   iram4: entity work.Instruction_memory_4 port map(clk,iram4_addr(6 downto 0),iram4_response);       
+
+   --iram1: entity work.Instruction_memory port map(clk,iram1_addr(6 downto 0),iram1_response);
+   --iram2: entity work.Instruction_memory_2 port map(clk,iram2_addr(6 downto 0),iram2_response);  
+   --iram3: entity work.Instruction_memory_3 port map(clk,iram3_addr(6 downto 0),iram3_response);  
+   --iram4: entity work.Instruction_memory_4 port map(clk,iram4_addr(6 downto 0),iram4_response);  
+   
+     iram1: entity work.low_capacity_RAM port map(iram1_addr(12 downto 0),initial_program_load_word,iram_enables(0),clk,iram1_response);
+     iram2: entity work.low_capacity_RAM port map(iram2_addr(12 downto 0),initial_program_load_word,iram_enables(1),clk,iram2_response);
+     iram3: entity work.low_capacity_RAM port map(iram3_addr(12 downto 0),initial_program_load_word,iram_enables(2),clk,iram3_response);
+     iram4: entity work.low_capacity_RAM port map(iram4_addr(12 downto 0),initial_program_load_word,iram_enables(3),clk,iram4_response);
                                          
    -- interfaz para memoria de instrucciones
 
     i_memory_manager: entity work.IRAM_memory_manager port map(
-        instruction_pointer_PC,
+        iram_requested_address,
         iram1_response, iram2_response, iram3_response, iram4_response,
         iram1_addr,iram2_addr,iram3_addr,iram4_addr,
-        instruccion_actual_entrada_fetch
+        instruccion_actual_entrada_fetch,
+        iram_enables,
+        enable_initial_program_load_instr
     );
+
+    iram_requested_address <= instruction_pointer_PC when enable_initial_program_load_instr = '0' else 
+                              "00000000000000" & initial_program_load_addr;
    -- memorias de datos
         
    ram_1: entity work.Dual_port_RAM port map(
@@ -344,10 +367,10 @@ begin
     
   interfaz_RAM: entity work.memory_manager port map(
         clk,'0',reset,                                                                  -- At least for now, this phase never stalls
-        rw_memory,                                                                      -- Enable de escritura en memoria, lo proporciona la etapa memory
-        bytes_to_write_memory,                                                          -- Cantidad de bits a escribir (00 -> 8 bit, 01 -> 16 bit, else 32 bit). Lo proporciona memory
-        memory_data_to_write,                                                           -- Datos a escribir en memoria, lo proporciona memory
-        memory_dir(17 downto 0),                                                         -- Direccion en la que escribir en memoria, lo proporciona memory
+        memory_manager_rw, --rw_memory,                                                 -- Enable de escritura en memoria, lo proporciona la etapa memory
+        memory_manager_byte_amount,--bytes_to_write_memory,                             -- Cantidad de bits a escribir (00 -> 8 bit, 01 -> 16 bit, else 32 bit). Lo proporciona memory
+        memory_manager_write_data, --memory_data_to_write,                               -- Datos a escribir en memoria, lo proporciona memory
+        memory_manager_request_addr, --memory_dir(17 downto 0),                          -- Direccion en la que escribir en memoria, lo proporciona memory
         ram_1_response,ram_2_response,ram_3_response,ram_4_response,                    -- Respuestas de las memorias RAM, contienen datos a juntar. 
         lowc_ram_1_response,lowc_ram_2_response,lowc_ram_3_response,lowc_ram_4_response, -- datos enviados por las memorias de poca capacidad
         ram_1_write_data,ram_2_write_data,ram_3_write_data,ram_4_write_data,            -- Datos separados enviados a cada banco RAM para escribir en ellos
@@ -355,7 +378,19 @@ begin
         memory_data_to_read,                                                            -- Datos leidos de la RAM, se envian a memory
         ram_enables                                                                     -- Enable de escritura de las 4 RAM. la cuarta contiene la direccion mas pequeña
   );
-        
+
+
+  -- Multiplexing of memory manager input between extern load and memory stage
+
+  memory_manager_rw <= rw_memory when enable_initial_program_load_data = '0' else 
+                       '1'; -- When enable write from outside the pipeline (SD card), write to memory
+  memory_manager_byte_amount <= bytes_to_write_memory when enable_initial_program_load_data = '0' else 
+                       "00"; -- Write 1 byte (one address at a time) when loaded from SD card
+  memory_manager_write_data <= memory_data_to_write when enable_initial_program_load_data = '0' else 
+                        x"000000" & initial_program_load_word;
+  memory_manager_request_addr <= memory_dir(17 downto 0) when enable_initial_program_load_data = '0' else 
+                        initial_program_load_addr;
+
         
    banco_registros: entity work.Registros port map(
        data_rs1,                                    -- Datos de lectura de rs1, se envia a decode (primer operando)
