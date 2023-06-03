@@ -338,7 +338,7 @@ enable_addr_parallel_load <= '1' when state = "011010" and load_new_state = '1' 
 
 addr_parallel_load <= x"0000" & "00" when state = "011010" else 
                       x"07D0" & "00" when state = "011001" else --  MTVAL (Interrupt Vector Address)
-                      x"0000" & "00" when state = "011000" else 
+                      x"7080" & "00" when state = "011000" else 
                       x"0000" & "00";
 
 enable_initial_program_load_instr <= '1' when state = "011001" else '1' when state = "011000" else '0';
