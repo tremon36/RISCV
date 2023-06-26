@@ -156,7 +156,7 @@ end_vertical: j end_vertical
 
 render_pixel: 
 
-srli x16,x16,1 # Divide iter by two
+add x2,x2,x16 # add iteration to .data pointer (get gradient position)
 lbu x25,0(x2)
 
 addi x2,x2,80 # Point to G value
